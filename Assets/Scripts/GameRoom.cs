@@ -11,21 +11,17 @@ public class GameRoom
     public int rewardThreshold;
     public int initialLife;
     public int changeAfterFails;
-
+    
     public List<Player> players=new();
     public List<Player> spectators = new List<Player>();
     public HashSet<string> usedWords = new HashSet<string>();
 
     public int currentPlayer;
     public string state = GameState.BeforeStart;
+    public string winner = "";
     public string currentSegment = "?";
     public int currentFail;
     public int timeLeft;
-
-    public Player winner
-    {
-        get { return players.First(p => p.alive); }
-    }
 
     /**
      * Keep synchronized with Kotlin version

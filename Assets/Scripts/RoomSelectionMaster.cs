@@ -25,6 +25,11 @@ public class RoomSelectionMaster : MonoBehaviour
     {
         SceneManager.LoadScene("CreateNewRoomScene");
     }
+
+    public void Back()
+    {
+        SceneManager.LoadScene("TitleScene");
+    }
     
     public async void RefreshRooms()
     {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -10,11 +11,23 @@ public class StartButton : MonoBehaviour
     public TMP_InputField username;
     public TMP_InputField host;
     public GameObject dialog;
-    
+    public TMP_Text dialogText;
+    private void Start()
+    {
+        username.text = Globals.username;
+        host.text = Globals.host;
+    }
+
     public void OnClick()
     {
         if (username.text == "" || host.text == "")
         {
+            dialogText.text = "Please provide username and host.";
+            dialog.SetActive(true);
+        }else if (!Globals.checkValid(username.text))
+        {
+            dialogText.text =
+                "Username invalid. Please check for special characters and make sure it is no longer than 30 characters.";
             dialog.SetActive(true);
         }
         else

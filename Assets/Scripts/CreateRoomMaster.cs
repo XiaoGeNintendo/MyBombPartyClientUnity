@@ -23,6 +23,11 @@ public class CreateRoomMaster : MonoBehaviour
                 return "Name must be specified";
             }
 
+            if (!Globals.checkValid(name.text))
+            {
+                return "Name is illegal";
+            }
+            
             if (int.Parse(tmo.text)<=0)
             {
                 return "Timeout must be positive";

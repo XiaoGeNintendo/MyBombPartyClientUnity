@@ -5,7 +5,9 @@ using System.Threading;
 using NativeWebSocket;
 using Newtonsoft.Json;
 using TMPro;
+using Tweens;
 using UnityEngine;
+using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -22,6 +24,10 @@ public class GameMaster : MonoBehaviour
     public GameObject dialog;
     public TMP_Text dialogText;
 
+    public GameObject normalDialog;
+    public TMP_Text normalDialogText;
+    public Button normalDialogButton;
+    
     public Image arrow;
     public TMP_Text usedWords;
 
@@ -40,9 +46,12 @@ public class GameMaster : MonoBehaviour
     private WebSocket ws;
 
     private List<PlayerUI> playerUIs=new();
+
+    private bool isAdmin;
     
     private void DoError(string s)
     {
+        normalDialog.SetActive(false);
         dialogText.text = s;
         dialog.SetActive(true);
     }
@@ -58,13 +67,16 @@ public class GameMaster : MonoBehaviour
         usedWords.text = string.Join("\n",room.usedWords);
         foreach (var player in room.players)
         {
-            var obj=Instantiate(playerPrefab,players.transform).Init(player.name,player.life);
+            var obj=Instantiate(playerPrefab,players.transform).Init(player.name,player.life,this);
+            obj.ToggleNet(player.online);
             playerUIs.Add(obj);
         }
 
         roomName.text = room.name;
         timeDisplay.text = room.timeLeft / 10 + "";
         segmentDisplay.text = room.currentSegment;
+        
+        isAdmin = room.players.Count==0 || room.players[0].name == Globals.username;
         
         UpdateArrow();
         UpdateRoomState();
@@ -85,9 +97,13 @@ public class GameMaster : MonoBehaviour
         float angle = room.currentPlayer * angleStep;
 
         // Set angle. Rubbish CS
-        var t = arrow.transform.localEulerAngles;
-        t.z = angle-90f;
-        arrow.transform.localEulerAngles = t;
+        arrow.gameObject.AddTween(new LocalEulerAnglesZTween()
+        {
+            to=angle-90f,
+            duration = 0.1f,
+            easeType = EaseType.QuadInOut
+        });
+        
     }
 
     private void UpdateRoomState()
@@ -96,14 +112,16 @@ public class GameMaster : MonoBehaviour
         {
             segmentDisplay.text = "Waiting for start...";
             timeDisplay.gameObject.SetActive(false);
+            arrow.gameObject.SetActive(false);
         }else if (room.state == GameState.Running)
         {
-            // segmentDisplay.text = "?";
             timeDisplay.gameObject.SetActive(true);
+            arrow.gameObject.SetActive(true);
         }else if (room.state == GameState.Ended)
         {
-            segmentDisplay.text = "Last winner: " + room.winner.name;
+            segmentDisplay.text = "Last winner: " + room.winner;
             timeDisplay.gameObject.SetActive(false);
+            arrow.gameObject.SetActive(false);
         }
     }
     void Update()
@@ -111,6 +129,12 @@ public class GameMaster : MonoBehaviour
 #if !UNITY_WEBGL || UNITY_EDITOR
         ws.DispatchMessageQueue();
 #endif
+        
+        //Enable or disable the buttons
+        startButton.gameObject.SetActive(isAdmin);
+        endButton.gameObject.SetActive(isAdmin);
+        startButton.interactable = room!=null && room.players.Count >= 2 && room.state != GameState.Running;
+        playerUIs.ForEach(p=>p.kickBtn.gameObject.SetActive(isAdmin && room.state!=GameState.Running));
     }
     
     async void OnApplicationQuit()
@@ -145,9 +169,10 @@ public class GameMaster : MonoBehaviour
     {
         return t.Replace("#", "").Replace("<", "").Replace(">", "");
     }
+    
     public async void Type()
     {
-        if (ws.State == WebSocketState.Open && room.players[room.currentPlayer].name==Globals.username)
+        if (ws.State == WebSocketState.Open && room.state==GameState.Running && room.players[room.currentPlayer].name==Globals.username)
         {
             await ws.SendText("type#"+Filter(field.text));
         }
@@ -155,19 +180,32 @@ public class GameMaster : MonoBehaviour
 
     public async void Send()
     {
-        if (ws.State == WebSocketState.Open && room.players[room.currentPlayer].name==Globals.username)
+        if (ws.State == WebSocketState.Open && room.state==GameState.Running && room.players[room.currentPlayer].name==Globals.username)
         {
             await ws.SendText("confirm#" + Filter(field.text));
+        }
+        field.ActivateInputField();
+    }
+
+    public async void Kick(string username)
+    {
+        if (ws.State == WebSocketState.Open && isAdmin && room.state != GameState.Running)
+        {
+            await ws.SendText("kick#" + username);
         }
     }
     
     private async void Start()
     {
+        usedWords.autoSizeTextContainer = true;
+        DoInfo("Connecting...", false);
+        
         ws = new WebSocket("ws://" + Globals.host + "/join/" + Globals.toJoin);
         ws.OnOpen += () =>
         {
             ws.SendText(Globals.clientVersion);
             ws.SendText(Globals.username);
+            normalDialog.SetActive(false);
         };
 
         ws.OnError += (e) =>
@@ -211,7 +249,7 @@ public class GameMaster : MonoBehaviour
                 if (code == "new_player")
                 {
                     room.players.Add(new Player(para,room.initialLife));
-                    playerUIs.Add(Instantiate(playerPrefab, players.transform).Init(para, room.initialLife));
+                    playerUIs.Add(Instantiate(playerPrefab, players.transform).Init(para, room.initialLife,this));
                 }else if (code == "disconnect")
                 {
                     for (int i = 0; i < room.players.Count; i++)
@@ -219,6 +257,16 @@ public class GameMaster : MonoBehaviour
                         if (room.players[i].name == para)
                         {
                             playerUIs[i].ToggleNet(false);
+                            break;
+                        }
+                    }
+                }else if(code=="connect"){
+                    
+                    for (int i = 0; i < room.players.Count; i++)
+                    {
+                        if (room.players[i].name == para)
+                        {
+                            playerUIs[i].ToggleNet(true);
                             break;
                         }
                     }
@@ -281,6 +329,7 @@ public class GameMaster : MonoBehaviour
                     }
                 }else if (code == "win")
                 {
+                    room.winner = para;
                     room.state = GameState.Ended;
                     UpdateRoomState();
                 }else if (code == "fail")
@@ -296,9 +345,23 @@ public class GameMaster : MonoBehaviour
                 {
                     room.usedWords.Add(para);
                     usedWords.text += "\n" + para;
+                    usedWords.ForceMeshUpdate();
                 }else if (code == "type")
                 {
                     playerUIs[room.currentPlayer].Type(para);
+                }else if (code == "kick")
+                {
+                    for (int i = 0; i < room.players.Count; i++)
+                    {
+                        if (room.players[i].name == para)
+                        {
+                            Debug.Log("Index="+i+" found to kick!");
+                            room.players.RemoveAt(i);
+                            Destroy(playerUIs[i].gameObject);
+                            playerUIs.RemoveAt(i);
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -311,5 +374,12 @@ public class GameMaster : MonoBehaviour
         Debug.Log("GameMaster Connecting");
         await ws.Connect();
         
+    }
+
+    private void DoInfo(string msg, bool closable)
+    {
+        normalDialogText.text = msg;
+        normalDialogButton.gameObject.SetActive(closable);
+        normalDialog.SetActive(true);
     }
 }

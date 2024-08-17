@@ -1,6 +1,7 @@
 ﻿using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PlayerUI : MonoBehaviour
 {
@@ -9,10 +10,12 @@ public class PlayerUI : MonoBehaviour
     public GameObject bar;
     public GameObject[] hpImages;
     public TMP_Text worder;
+    public Button kickBtn;
     
     private string names;
     private int hp;
 
+    private GameMaster master;
     void Start()
     {
         name.text = names;
@@ -20,10 +23,17 @@ public class PlayerUI : MonoBehaviour
         UpdateHP();
     }
 
-    public PlayerUI Init(string name, int hp)
+    private void kickWrapper()
+    {
+        master.Kick(names);
+    }
+    
+    public PlayerUI Init(string name, int hp,GameMaster master)
     {
         this.names = name;
         this.hp = hp;
+        this.master = master;
+        kickBtn.onClick.AddListener(kickWrapper);
         return this;
     }
     
