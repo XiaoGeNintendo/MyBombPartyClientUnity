@@ -74,7 +74,7 @@ public class CreateRoomMaster : MonoBehaviour
         errorText.text = "Creating Room...";
         submitBtn.interactable = false;
         
-        ws = new WebSocket("ws://" + Globals.host + "/createRoom");
+        ws = new WebSocket(Globals.protocol+"://" + Globals.host + "/createRoom");
         ws.OnOpen += () =>
         {
             errorText.text = "Connection opened";

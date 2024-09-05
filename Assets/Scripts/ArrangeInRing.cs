@@ -1,4 +1,5 @@
 ﻿using System;
+using Tweens;
 using UnityEngine;
 
 public class ArrangeInRing : MonoBehaviour
@@ -36,7 +37,15 @@ public class ArrangeInRing : MonoBehaviour
             float y = Mathf.Sin(radian) * radius;
 
             // Set the position of the child
-            child.localPosition = new Vector3(x, y, 0f);
+            var movement = new LocalPositionTween
+            {
+                easeType = EaseType.QuadInOut,
+                duration = 0.3f,
+                from = child.transform.localPosition,
+                to = new Vector3(x, y, 0f)
+            };
+
+            child.gameObject.AddTween(movement);
         }
     }
 }

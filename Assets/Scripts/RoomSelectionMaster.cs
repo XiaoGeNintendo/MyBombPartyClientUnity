@@ -38,8 +38,10 @@ public class RoomSelectionMaster : MonoBehaviour
         rooms.transform.DetachChildren();
 
         errorText.text = "Connecting to server...";
-        
-        ws = new WebSocket("ws://" + Globals.host+"/rooms");
+
+        var url = $"{Globals.protocol}://{Globals.host}/rooms";
+        // Debug.Log(url);
+        ws = new WebSocket(url);
         ws.OnOpen += () =>
         {
             errorText.text = "Connection opened";

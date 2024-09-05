@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
+using Toggle = UnityEngine.UI.Toggle;
 
 public class StartButton : MonoBehaviour
 {
@@ -12,6 +13,8 @@ public class StartButton : MonoBehaviour
     public TMP_InputField host;
     public GameObject dialog;
     public TMP_Text dialogText;
+    public Toggle secure;
+    
     private void Start()
     {
         username.text = Globals.username;
@@ -34,6 +37,7 @@ public class StartButton : MonoBehaviour
         {
             Globals.username = username.text;
             Globals.host = host.text;
+            Globals.protocol = secure.isOn ? "wss" : "ws";
             SceneManager.LoadScene("RoomSelectionScene");
         }
     }

@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Coffee.UIExtensions;
 using NativeWebSocket;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TMPro;
 using Tweens;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.PlayerLoop;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -40,6 +43,13 @@ public class GameMaster : MonoBehaviour
     public TMP_InputField field;
     public Button startButton;
     public Button endButton;
+
+    public ParticleSystem particle;
+    public UIParticle uiParticle;
+    
+    public Material materialAccepted,materialWrongAnswer,materialUsed,materialHurt,materialHeal;
+
+    public TMP_Text meaningHinter;
     
     private GameRoom room;
 
@@ -56,6 +66,43 @@ public class GameMaster : MonoBehaviour
         dialog.SetActive(true);
     }
 
+    private void PlayParticle(Vector3 location, Material type)
+    {
+        uiParticle.Stop();
+        uiParticle.transform.localPosition = location;
+        particle.GetComponent<ParticleSystemRenderer>().material = type;
+        uiParticle.Play();
+    }
+
+    private void PlayParticle(Vector3 pos, string type)
+    {
+        if (type == "heal")
+        {
+            PlayParticle(pos,materialHeal);
+        }else if (type == "hurt")
+        {
+            PlayParticle(pos,materialHurt);
+        }else if (type == "used")
+        {
+            PlayParticle(pos,materialUsed);
+        }else if (type == "success")
+        {
+            PlayParticle(pos,materialAccepted);
+        }else if (type == "fail")
+        {
+            PlayParticle(pos,materialWrongAnswer);
+        }
+        else
+        {
+            Debug.LogError("Unknown particle type: " + type);
+        }
+    }
+    private void PlayParticle(string type)
+    {
+        var pos = playerUIs[room.currentPlayer].transform.localPosition;
+        PlayParticle(pos,type);
+    }
+    
     private void InitializeRoom()
     {
         foreach (var i in playerUIs)
@@ -194,13 +241,49 @@ public class GameMaster : MonoBehaviour
             await ws.SendText("kick#" + username);
         }
     }
-    
+
+    private void HintMeaning(string word)
+    {
+        if (room.lang == "en")
+        {
+            Debug.Log("Hinting meaning of: "+word);
+            UnityWebRequest webRequest = UnityWebRequest.Get("https://api.dictionaryapi.dev/api/v2/entries/en/" + word);
+            webRequest.SendWebRequest().completed += (e) =>
+            {
+                if (webRequest.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogWarning("Could not connect to dictionary server:" + webRequest.error);
+                    return;
+                }
+
+                try
+                {
+                    var jo = JArray.Parse(webRequest.downloadHandler.text);
+                    var finalString = "<size=+10>" + word + "</size>\n";
+                    foreach (var token in jo[0]["meanings"])
+                    {
+                        finalString += "<b>As: " + token["partOfSpeech"] + "</b>\n";
+                        foreach (var def in token["definitions"])
+                        {
+                            finalString += "-" + def["definition"] + "\n";
+                        }
+                    }
+
+                    meaningHinter.text = finalString;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("Error loading dictionary:" + ex);
+                }
+            };
+        }
+    }
     private async void Start()
     {
         usedWords.autoSizeTextContainer = true;
         DoInfo("Connecting...", false);
-        
-        ws = new WebSocket("ws://" + Globals.host + "/join/" + Globals.toJoin);
+
+        ws = new WebSocket($"{Globals.protocol}://{Globals.host}/join/{Globals.toJoin}");
         ws.OnOpen += () =>
         {
             ws.SendText(Globals.clientVersion);
@@ -285,6 +368,8 @@ public class GameMaster : MonoBehaviour
                         if (room.players[i].name == para)
                         {
                             // Debug.Log("Find index="+i);
+                            PlayParticle(playerUIs[i].transform.localPosition,"hurt");
+                            
                             room.players[i].life--;
                             if (room.players[i].life <= 0)
                             {
@@ -300,6 +385,7 @@ public class GameMaster : MonoBehaviour
                     {
                         if (room.players[i].name == para)
                         {
+                            PlayParticle(playerUIs[i].transform.localPosition,"heal");
                             room.players[i].life++;
                             playerUIs[i].SetHP(room.players[i].life);
                             break;
@@ -334,15 +420,17 @@ public class GameMaster : MonoBehaviour
                     UpdateRoomState();
                 }else if (code == "fail")
                 {
-                    //TODO
+                    PlayParticle("fail");
                 }else if (code == "used")
                 {
-                    //TODO
+                    PlayParticle("used");
                 }else if (code == "close")
                 {
                     //TODO Closed
                 }else if (code == "success")
                 {
+                    PlayParticle("success");
+                    HintMeaning(para);
                     room.usedWords.Add(para);
                     usedWords.text += "\n" + para;
                     usedWords.ForceMeshUpdate();
