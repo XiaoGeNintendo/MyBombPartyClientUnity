@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class Globals : MonoBehaviour
 {
-    public static string host="localhost:8058";
-    public static string username="zjs";
+    public static string host="bomb.hellholestudios.top";
+    public static string username="";
     public static string protocol = "ws";
     public const string clientVersion = "4";
     public static string toJoin;

@@ -58,6 +58,8 @@ public class GameMaster : MonoBehaviour
     private List<PlayerUI> playerUIs=new();
 
     private bool isAdmin;
+
+    private string lastSubmitted;
     
     private void DoError(string s)
     {
@@ -70,7 +72,10 @@ public class GameMaster : MonoBehaviour
     {
         uiParticle.Stop();
         uiParticle.transform.localPosition = location;
+        uiParticle.material = type;
         particle.GetComponent<ParticleSystemRenderer>().material = type;
+        uiParticle.RefreshParticles();
+        uiParticle.SetMaterialDirty();
         uiParticle.Play();
     }
 
@@ -227,9 +232,10 @@ public class GameMaster : MonoBehaviour
 
     public async void Send()
     {
-        if (ws.State == WebSocketState.Open && room.state==GameState.Running && room.players[room.currentPlayer].name==Globals.username)
+        if (ws.State == WebSocketState.Open && room.state==GameState.Running && room.players[room.currentPlayer].name==Globals.username && lastSubmitted!=field.text)
         {
             await ws.SendText("confirm#" + Filter(field.text));
+            lastSubmitted = field.text;
         }
         field.ActivateInputField();
     }
